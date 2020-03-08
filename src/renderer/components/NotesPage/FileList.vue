@@ -7,7 +7,7 @@
             <li class="files__li" v-for="folder in folders" v-bind:key="folder.name"
                 v-show="!folder.isHidden || showHidden">
 
-                <div class="files__folder-name files__folder-name--open">
+                <div v-show="folder.name" class="files__folder-name files__folder-name--open">
                     <span>{{folder.name}}</span>
                     <button v-on:click="createNoteFile(folder.name)" class="files__button">New</button>
                 </div>
@@ -43,6 +43,7 @@ import dateFormat from 'dateformat'
 import Dialogs from 'dialogs'
 
 import Search from '../../Search.js'
+import TaskHelper from '../../TaskHelper.js'
 
 // import { mapGetters, mapActions } from 'vuex'
 
@@ -68,6 +69,7 @@ export default {
         this.logger.debug()
 
         this.loadFilesFromDataDir()
+        this.createTaskOverview()
 
         this.$root.$on('file-created', this.loadFilesFromDataDir)
         this.$root.$on('file-deleted', this.loadFilesFromDataDir)
@@ -81,11 +83,20 @@ export default {
             
             if (fs.existsSync(this.config.dataDir)) {
 
-                this.folders = []
+                this.folders = [
+                    {
+                        'name': '',
+                        'path': '',
+                        'type': 'folder',
+                        'isHidden': false,
+                        'files': []
+                    }
+                ]
 
                 let files = fs.readdirSync(this.config.dataDir)
 
                 files.forEach(fileName => {
+
                     let filePath = path.join(this.config.dataDir, fileName)
                     let fileStat = fs.lstatSync(filePath)
 
@@ -107,30 +118,46 @@ export default {
                         let files = fs.readdirSync(filePath)
 
                         files.forEach(fileName => {
-
-                            let isHidden = false
-                            if(fileName[0] === '.') {
-                                isHidden = true
-                            }
-
-                            if(! fs.lstatSync(path.join(filePath, fileName)).isDirectory()) {
-
-                                let fileNameExt = fileName.split(/\./)
-
-                                folder.files.push({
-                                    'name': fileNameExt[0],
-                                    'ext': fileNameExt[1],
-                                    'path': path.join(filePath, fileName),
-                                    'type': 'file',
-                                    'isHidden': isHidden
-                                })                                
+                            let file = this.formatFile(filePath, fileName)
+                            if(file) {
+                                folder.files.push(file)
                             }
                         })
 
                         this.folders.push(folder)
+                    
+                    } else {
+
+                        let file = this.formatFile(this.config.dataDir, fileName)
+                        if(file) {
+                            this.folders[0].files.push(file)
+                        }
                     }
                 })
             }
+        },
+
+        formatFile: function(filePath, fileName) {
+
+            let isHidden = false
+            if(fileName[0] === '.') {
+                isHidden = true
+            }
+
+            if(! fs.lstatSync(path.join(filePath, fileName)).isDirectory()) {
+
+                let fileNameExt = fileName.split(/\./)
+
+                return {
+                    'name': fileNameExt[0],
+                    'ext': fileNameExt[1],
+                    'path': path.join(filePath, fileName),
+                    'type': 'file',
+                    'isHidden': isHidden
+                }                             
+            }
+
+            return false
         },
 
         toggleHidden: function() {
@@ -200,6 +227,25 @@ export default {
             }
         },
 
+        createTaskOverview: function () {
+            this.logger.debug()
+
+            this.config.taskFilePath = path.join(this.config.dataDir, this.config.taskFileName + this.config.fileExtension)
+
+            const excludeFiles = [
+                this.config.taskFileName,
+                this.config.templateFileName
+            ]
+
+            const taskHelper = new TaskHelper(this.config.taskFilePath, this.config.dataDir, this.folders, excludeFiles)
+
+            const filePath = taskHelper.writeTasksOverview()
+            if (filePath) {
+                this.logger.debug('emit file-created', filePath)
+                this.$root.$emit('file-created', filePath)
+            }
+        },
+
         openContextmenu: function (folderName, fileName, evt) {
             this.logger.debug(folderName, fileName)
 
@@ -236,6 +282,10 @@ export default {
             this.logger.debug()
 
             if(! fs.lstatSync(filePath).isDirectory()) {
+
+                if(path.basename(filePath).indexOf(this.config.taskFileName) > -1) {
+                    this.createTaskOverview()
+                }
                 
                 // TODO: highlight current file
 
@@ -250,7 +300,7 @@ export default {
 
             dialogs.prompt('New Filename', oldFileName, newFileName => {
 
-                if(! newFilePath) {
+                if(! newFileName) {
                     return
                 }
 
@@ -270,22 +320,27 @@ export default {
         },
 
         deleteFile: function (fileFolder, fileName) {
-            this.logger.debug()
+            this.logger.debug(fileFolder, fileName)
 
             if (!confirm('Delete File? ' + fileName)) {
                 return false
             }
 
-            let filePath = path.join(this.config.dataDir, fileFolder, fileName)
+            let filePath = path.join(this.config.dataDir, fileFolder, fileName) + this.config.fileExtension
 
             if (fs.existsSync(filePath)) {
+
+                this.logger.debug('unlinkSync', filePath)
                 fs.unlinkSync(filePath)
 
                 this.$root.$emit('file-deleted', fileFolder, fileName)
 
-                if (this.folders.length && this.folders[0].files.length) {
-                    this.openFile(path.join(this.config.dataDir, this.folders[0], this.folders[0].files[0].name))
-                }
+                /* if (this.folders.length && this.folders[0].files.length) {
+                    let openFilePath = path.join(this.config.dataDir, this.folders[0].name, this.folders[0].files[0].name) + this.config.fileExtension
+                    
+                    this.logger.debug('unlinkSync', openFilePath)
+                    this.openFile(openFilePath)
+                } */
             }
         },
 

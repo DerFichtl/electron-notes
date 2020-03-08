@@ -16,7 +16,7 @@ class Search {
      * @param string ignoreFiles 
      * @param bool plain: strip off html tags and search only in plain text
      */
-    filterFiles(query, fullResults = false, ignoreFiles = '', plain = true) {
+    filterFiles(query, fullResults = false, ignoreFiles = [], plain = true) {
 
         let regexp = new RegExp(query, "igm")
         let results = this.folders
@@ -27,10 +27,10 @@ class Search {
             for (let ff in results[f].files) {
                 const file = results[f].files[ff]
 
-                if(file.name === '') {
+                if(file.name === '' || file.name === undefined) {
                     continue
                 }
-
+                
                 if (ignoreFiles && ignoreFiles.indexOf(file.name) !== -1) {
                     continue
                 }
@@ -63,9 +63,7 @@ class Search {
                     if(matchesArr.length === 0) {
                         // remove file from results if no matches
                         results[f].files[ff] = { }
-                    }
-
-                    if(fullResults === true) {
+                    } else if (fullResults === true && matchesArr.length > 0) {
                         results[f].files[ff].matches = matchesArr
                     }
                 }

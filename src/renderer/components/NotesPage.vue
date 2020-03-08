@@ -18,19 +18,22 @@ import FileList from './NotesPage/FileList'
 import EditorPanel from './NotesPage/EditorPanel'
 import Keyboard from '../Keyboard.js'
 
-
 export default {
     name: 'App',
     components: { FileList, EditorPanel },
     data: function() {
         return {
-            configFilePath: '',
             config: null,
+            logger: null,
+
+            configFilePath: '',
             currentFilePath: '',
         };
     },
     created: function() {
         this.loadConfig();
+
+        this.logger = this.$root.$log
 
         // let keyboard = new Keyboard(this)
         // keyboard.bindApp()
@@ -39,7 +42,8 @@ export default {
 
     },
     methods: {
-        loadConfig: function() {
+
+        loadConfig: function () {
 
             let docDir = remote.app.getPath('documents')
             let configFilePath = path.join(docDir, 'Electron Notes/.Config/Config.json')
@@ -57,7 +61,8 @@ export default {
 
             this.$store.commit('setConfig', config)
         },
-        createConfig: function(docDir, configFilePath) {
+
+        createConfig: function (docDir, configFilePath) {
 
             let config = {
                 "docDir": docDir,

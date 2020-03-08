@@ -11,7 +11,6 @@ import path from 'path'
 import Quill from 'quill'
 import dateFormat from 'dateformat'
 
-import TaskHelper from '../../TaskHelper.js'
 import Keyboard from '../../Keyboard.js'
 
 export default {
@@ -38,11 +37,6 @@ export default {
 
         this.initEditor()
 
-        this.taskFilePath = path.join(this.config.dataDir, this.config.taskFileName + this.config.fileExtension)
-        if (!fs.existsSync(this.taskFilePath)) {
-            this.initTaskOverview()
-        }
-
         this.$root.$on('file-deleted', (fileName) => {
             // console.log(fileName)
         })
@@ -59,7 +53,7 @@ export default {
         window.setTimeout(this.setEditorContent, 100) // TODO check why this is necessary
 
         window.setInterval(() => {
-            if (this.internalContent !== this.lastInternalContent) {
+            if (this.currentFilePath && this.internalContent !== this.lastInternalContent) {
                 this.lastInternalContent = this.internalContent
                 this.saveFile(this.currentFilePath, this.internalContent)
             }
@@ -97,51 +91,18 @@ export default {
             keyboard.bindEditor(this.editor)
         },
 
-        initTaskOverview: function () {
-            this.logger.debug()
-
-            const taskHelper = new TaskHelper(this.config.taskFileName + this.config.fileExtension, this.config.dataDir,
-                [this.config.taskFileName + this.config.fileExtension, this.config.templateFileName + this.config.fileExtension])
-
-            const filePath = taskHelper.writeTasksOverview()
-            if (filePath) {
-                this.logger.debug('emit file-created', filePath)
-                this.$root.$emit('file-created', filePath)
-            }
-        },
-
         loadFile: function (filePath) {
             this.logger.debug(filePath)
 
             // create or update the task overview file
-            if (path.basename(filePath) === this.config.taskFileName + this.config.fileExtension) {
+            /* if (path.basename(filePath) === this.config.taskFileName + this.config.fileExtension) {
                 this.initTaskOverview()
-            }
+            } */
 
             if (fs.existsSync(filePath)) {
-
                 this.internalContent = fs.readFileSync(filePath, 'utf-8')
                 this.currentFilePath = filePath
                 this.$root.$emit('file-loaded', filePath)
-
-            } else {
-                let now = new Date()
-                let date = dateFormat(now, 'yyyy-mm-dd')
-
-                const templateFilePath = path.join(this.config.dataDir, this.config.templateFileName + this.config.fileExtension)
-
-                if (fs.existsSync(templateFilePath)) {
-                    let content = fs.readFileSync(templateFilePath, 'utf-8')
-                    content = content.replace(/{{DATE}}/g, date)
-                    content = content.replace(/{{TITLE}}/g, '')
-
-                    this.internalContent = content
-                }
-
-                this.saveFile(filePath, this.internalContent)
-                this.currentFilePath = filePath
-
-                this.$root.$emit('file-created', filePath)
             }
         },
 
@@ -179,6 +140,32 @@ export default {
 
 .ql-editor ul[data-checked="true"] li::before {
     font-size: 1.2rem;
+}
+
+.ql-container {
+    font-size: 1rem;
+    height: calc(100% - 40px);
+}
+
+.ql-editor ul > li {
+    line-height: 1.4rem;
+}
+
+.ql-snow .ql-editor h1, .ql-snow .ql-editor h2, .ql-snow .ql-editor h3,
+.ql-snow .ql-editor ul, .ql-snow .ql-editor ol {
+    margin-top: 0.5rem;
+}
+
+.ql-editor ul[data-checked="false"] > li::before,
+.ql-editor ul[data-checked="true"] > li::before {
+    font-size: 1.5rem;
+    margin-top: -0.2em;
+}
+
+.ql-editor ul > li::before {
+    content: '\2022';
+    font-size: 1.6rem;
+    vertical-align: middle;
 }
 
 </style>
