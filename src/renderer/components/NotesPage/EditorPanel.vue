@@ -11,7 +11,15 @@ import path from 'path'
 import Quill from 'quill'
 import dateFormat from 'dateformat'
 
-import Keyboard from '../../Keyboard.js'
+import EditorBindings from '../../keyboard/EditorBindings.js'
+
+
+/* let List = Quill.import('formats/list')
+class KeywordList extends List { }
+KeywordList.blotName = 'keywords';
+KeywordList.tagName = 'UL';
+KeywordList.className = 'keywords'
+Quill.register(KeywordList) */
 
 export default {
     name: 'EditorPanel',
@@ -60,6 +68,7 @@ export default {
         }, 500)
     },
     methods: {
+
         initEditor: function () {
             this.logger.debug()
 
@@ -73,22 +82,37 @@ export default {
                 ['clean']
             ]
 
+            let editorBindings = new EditorBindings(this)
+            const keyboardBindings = editorBindings.getEditorBindings()
+
+
             this.editor = new Quill('#editor', {
                 theme: 'snow',
                 modules: {
+                    keyboard: {
+                        bindings: keyboardBindings
+                    },
                     toolbar: toolbarOptions,
                     clipboard: {
-                        matchVisual: false // strange config of quill adds <p><br></p> if this is true
+                        matchVisual: false, // strange config of quill adds <p><br></p> if this is true
+                        matchers: editorBindings.getMatchers()
                     }
                 }
             })
+
+            console.log(this.editor.keyboard)
+
+            // keyboard.addBindings(this.editor)
 
             this.editor.on('text-change', (delta, oldDelta, source) => {
                 this.internalContent = this.editor.root.innerHTML
             })
 
-            let keyboard = new Keyboard(this)
-            keyboard.bindEditor(this.editor)
+            /* let toolbar = this.editor.getModule('toolbar')
+            toolbar.addHandler('keywords', function(){
+                console.log(this.quill)
+                this.quill.format('keywords', 'test')
+            }) */
         },
 
         loadFile: function (filePath) {
@@ -167,5 +191,13 @@ export default {
     font-size: 1.6rem;
     vertical-align: middle;
 }
+
+/*
+.ql-keywords::after {
+    content: 'K';
+}
+
+.keywords li { list-style-type:none; display:inline; }
+*/
 
 </style>

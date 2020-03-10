@@ -1,6 +1,8 @@
 'use strict'
 
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu} from 'electron'
+
+const isMac = process.platform === 'darwin'
 
 /**
  * Set `__static` path to static files in production
@@ -38,9 +40,9 @@ function createWindow () {
         mainWindow.maximize()
         mainWindow.show()
 
-        // if (process.env.env === 'development') {
+        if (process.env.env === 'development') {
             mainWindow.openDevTools()
-        // }
+        }
 
         webContents.on('will-navigate', handleRedirect)
         webContents.on('new-window', handleRedirect)
@@ -51,7 +53,38 @@ function createWindow () {
     mainWindow.on('closed', () => {
         mainWindow = null
     })
+
+
+    const template = [
+        {
+            label: app.name,
+            submenu: [
+                { role: 'about' },
+                { role: 'quit' }
+            ]
+        },
+        {
+            label: 'Edit',
+            submenu: [
+                { role: 'undo' },
+                { role: 'redo' },
+                { type: 'separator' },
+                { role: 'cut' },
+                { role: 'copy' },
+                { role: 'paste' },
+                { role: 'pasteAndMatchStyle' },
+                { role: 'delete' },
+                { role: 'selectAll' },
+            ]
+        }
+    ]
+
+    const menu = Menu.buildFromTemplate(template)
+    Menu.setApplicationMenu(menu)
+
 }
+
+
 
 app.on('ready', createWindow)
 
