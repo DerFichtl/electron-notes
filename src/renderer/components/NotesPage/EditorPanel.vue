@@ -78,7 +78,7 @@ export default {
                 ['blockquote', 'code-block'],
                 [{'list': 'ordered'}, {'list': 'bullet'}, {'list': 'check'}],
                 [{'color': []}, {'background': []}],
-                ['image', 'video'],
+                ['image', 'video', 'link'],
                 ['clean']
             ]
 
