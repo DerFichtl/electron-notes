@@ -8,18 +8,16 @@
 
 import fs from 'fs'
 import path from 'path'
-import Quill from 'quill'
 import dateFormat from 'dateformat'
 
-import EditorBindings from '../../keyboard/EditorBindings.js'
+// import Mousetrap from 'mousetrap'
+import Editor from '../../ckeditor.js'
 
+// import EditorBindings from '../../keyboard/EditorBindings.js'
 
-/* let List = Quill.import('formats/list')
-class KeywordList extends List { }
-KeywordList.blotName = 'keywords';
-KeywordList.tagName = 'UL';
-KeywordList.className = 'keywords'
-Quill.register(KeywordList) */
+import { shell, remote } from 'electron'
+const { Menu, MenuItem } = remote
+
 
 export default {
     name: 'EditorPanel',
@@ -45,11 +43,20 @@ export default {
 
         this.initEditor()
 
-        this.$root.$on('file-deleted', (fileName) => {
-            // console.log(fileName)
+        this.$root.$on('file-deleted', (filePath) => {
+            if(this.currentFilePath === filePath) {
+                this.currentFilePath = ''
+                this.internalContent = ''
+                this.setEditorContent()
+            }
         })
 
-        this.$root.$on('file-opened', (filePath) => {
+        this.$root.$on('file-clicked', (filePath) => {
+            this.loadFile(filePath)
+            this.setEditorContent()
+        })
+
+        this.$root.$on('file-created', (filePath) => {
             this.loadFile(filePath)
             this.setEditorContent()
         })
@@ -61,6 +68,13 @@ export default {
         window.setTimeout(this.setEditorContent, 100) // TODO check why this is necessary
 
         window.setInterval(() => {
+            
+            if(! this.currentFilePath) {
+                this.editor.isReadOnly = true
+            } else {
+                this.editor.isReadOnly = false
+            }
+
             if (this.currentFilePath && this.internalContent !== this.lastInternalContent) {
                 this.lastInternalContent = this.internalContent
                 this.saveFile(this.currentFilePath, this.internalContent)
@@ -72,56 +86,133 @@ export default {
         initEditor: function () {
             this.logger.debug()
 
-            const toolbarOptions = [
-                [{'header': [1, 2, 3, false]}],
-                ['bold', 'italic', 'underline', 'strike'],
-                ['blockquote', 'code-block'],
-                [{'list': 'ordered'}, {'list': 'bullet'}, {'list': 'check'}],
-                [{'color': []}, {'background': []}],
-                ['image', 'video', 'link'],
-                ['clean']
-            ]
+            ClassicEditor
+                .create(
+                    document.querySelector('#editor'),
+                    {
+                        toolbar: [ 'heading', '|',
+                            'bold', 'italic', 'link', 'fontColor', 'removeFormat', '|',
+                            'bulletedList', 'numberedList', 'todoList', '|',
+                            'blockQuote', 'codeBlock', '|',
+                            'insertTable', '|', 'mediaEmbed', 'imageUpload' ],
+                        heading: {
+                            options: [
+                                { model: 'paragraph', title: 'Paragraph', class: 'ck-heading_paragraph' },
+                                { model: 'heading1', view: 'h1', title: 'Heading 1', class: 'ck-heading_heading1' },
+                                { model: 'heading2', view: 'h2', title: 'Heading 2', class: 'ck-heading_heading2' },
+                                { model: 'heading3', view: 'h3', title: 'Heading 3', class: 'ck-heading_heading3' }
+                            ]
+                        },
+                        image: {
+                            toolbar: [
+                                'imageTextAlternative',
+                                'imageStyle:full',
+                                'imageStyle:side'
+                            ]
+                        },
+                        table: {
+                            contentToolbar: [
+                                'tableColumn',
+                                'tableRow',
+                                'mergeTableCells',
+                                'tableCellProperties',
+                                'tableProperties'
+                            ]
+                        },
+                    }
+                )
+                .then(editor => {
+                    this.editor = editor
 
-            let editorBindings = new EditorBindings(this)
-            const keyboardBindings = editorBindings.getEditorBindings()
+                    this.editor.model.document.on('change:data', () => {
+                        this.internalContent = editor.getData()
+                    })
 
+                    let container = editor.ui.view.editable.element
+                    container.addEventListener('contextmenu', (evt) => {
+                        this.openContextmenu(evt)
+                    })
 
-            this.editor = new Quill('#editor', {
-                theme: 'snow',
-                modules: {
-                    keyboard: {
-                        bindings: keyboardBindings
-                    },
-                    toolbar: toolbarOptions,
-                    clipboard: {
-                        matchVisual: false, // strange config of quill adds <p><br></p> if this is true
-                        matchers: editorBindings.getMatchers()
+                    console.log( Array.from( editor.ui.componentFactory.names() ));
+                })
+                .catch(error => {
+                    // 
+                })
+        },
+
+        openContextmenu: function (evt) {
+            this.logger.debug()
+
+            evt.preventDefault()
+
+            const menu = new Menu()
+
+            menu.append(new MenuItem({label: 'Undo', role: 'undo'}))
+            menu.append(new MenuItem({label: 'Redo', role: 'redo'}))
+
+            menu.append(new MenuItem({type: 'separator'}))
+
+            menu.append(new MenuItem({label: 'Cut', role: 'cut' }))
+            menu.append(new MenuItem({label: 'Copy', role: 'copy' }))
+            menu.append(new MenuItem({label: 'Paste', role: 'paste' }))
+
+            menu.append(new MenuItem({type: 'separator'}))
+
+            menu.append(new MenuItem({label: 'Select All', role: 'selectall' }))
+
+            menu.append(new MenuItem({
+                label: 'Create Link',
+                click: () => {
+                    let toolbarItems = this.editor.ui.view.toolbar.items
+                    for(let item of toolbarItems) {
+                        if(item.label === 'Link') {
+                            item.element.click()
+                        }
                     }
                 }
-            })
+            }))
 
-            console.log(this.editor.keyboard)
+            menu.append(new MenuItem({type: 'separator'}))
 
-            // keyboard.addBindings(this.editor)
+            menu.append(new MenuItem({
+                label: 'Wikipedia',
+                click: () => {
+                    const text = this.getSelectedText()
+                    const url = "https://de.wikipedia.org/wiki/" + text
+                    shell.openExternal(url)
+                }
+            }))
 
-            this.editor.on('text-change', (delta, oldDelta, source) => {
-                this.internalContent = this.editor.root.innerHTML
-            })
+            menu.append(new MenuItem({
+                label: 'Dict',
+                click: () => {
+                    const text = this.getSelectedText()
+                    const url = "https://www.dict.cc/?s=" + text
+                    shell.openExternal(url)
+                }
+            }))
 
-            /* let toolbar = this.editor.getModule('toolbar')
-            toolbar.addHandler('keywords', function(){
-                console.log(this.quill)
-                this.quill.format('keywords', 'test')
-            }) */
+            menu.popup({window: remote.getCurrentWindow()})
+        },
+
+        getSelectedText: function() {
+            const selection = this.editor.model.document.selection
+            const range = selection.getFirstRange()
+            
+            let text = ''
+            for (const item of range.getItems()) {
+                if(item.is('textProxy')) {
+                    if(text) {
+                        text += ' '
+                    }
+                    text += item.data
+                }
+            }
+            return text
         },
 
         loadFile: function (filePath) {
             this.logger.debug(filePath)
-
-            // create or update the task overview file
-            /* if (path.basename(filePath) === this.config.taskFileName + this.config.fileExtension) {
-                this.initTaskOverview()
-            } */
 
             if (fs.existsSync(filePath)) {
                 this.internalContent = fs.readFileSync(filePath, 'utf-8')
@@ -132,18 +223,12 @@ export default {
 
         saveFile: function (filePath, content) {
             this.logger.debug()
-
-            // console.log(content)
-            // TODO: do stuff if special file Open-Tasks File
-
             fs.writeFileSync(filePath, content, 'utf-8')
         },
 
         setEditorContent: function () {
             this.logger.debug()
-
-            let delta = this.editor.clipboard.convert(this.internalContent)
-            this.editor.setContents(delta, 'silent')
+            this.editor.setData(this.internalContent)
         }
 
     }
@@ -152,52 +237,9 @@ export default {
 
 <style lang="scss">
 
-@import '../../../../node_modules/quill/dist/quill.snow.css';
+.ck.ck-editor__editable_inline,
+.ck.ck-editor__editable:not(.ck-editor__nested-editable).ck-focused { border:none; outline:none; box-shadow:none; }
 
-.ql-container.ql-snow, .ql-toolbar.ql-snow {
-    border: none;
-}
-
-.ql-editor ul[data-checked="false"] > li::before {
-    font-size: 1.2rem;
-}
-
-.ql-editor ul[data-checked="true"] li::before {
-    font-size: 1.2rem;
-}
-
-.ql-container {
-    font-size: 1rem;
-    height: calc(100% - 40px);
-}
-
-.ql-editor ul > li {
-    line-height: 1.4rem;
-}
-
-.ql-snow .ql-editor h1, .ql-snow .ql-editor h2, .ql-snow .ql-editor h3,
-.ql-snow .ql-editor ul, .ql-snow .ql-editor ol {
-    margin-top: 0.5rem;
-}
-
-.ql-editor ul[data-checked="false"] > li::before,
-.ql-editor ul[data-checked="true"] > li::before {
-    font-size: 1.5rem;
-    margin-top: -0.2em;
-}
-
-.ql-editor ul > li::before {
-    content: '\2022';
-    font-size: 1.6rem;
-    vertical-align: middle;
-}
-
-/*
-.ql-keywords::after {
-    content: 'K';
-}
-
-.keywords li { list-style-type:none; display:inline; }
-*/
+.ck.ck-toolbar { border:none; background:none; }
 
 </style>

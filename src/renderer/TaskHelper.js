@@ -107,17 +107,29 @@ class TaskHelper {
 
         let content = "<h1>All Open Tasks</h1><p><br /></p>"
         let lastDate = ''
-  
+        let taskIndex = 0
+
         for (const task of tasks) {
             if(task.status === 'OPEN') {
-                if(lastDate != task.dueDate) {
-                    if(lastDate != '') {
-                        content += '</ul><p><br /></p>'
+
+                if(taskIndex === 0) {
+                    if(task.dueDate === '') {
+                        content += '<h2>No due date</h2><ul data-checked="false">'
+                    } else {
+                        content += '<h2>' + task.dueDate + '</h2><ul data-checked="false">'
                     }
+                }     
+
+                if(lastDate !== task.dueDate) {
+                    content += '</ul><p><br /></p>'
                     content += '<h2>' + task.dueDate + '</h2><ul data-checked="false">'
+                    
                     lastDate = task.dueDate
                 }
+
                 content += '<li>' + task.text + "</li>"
+
+                taskIndex++
             }
         }
 

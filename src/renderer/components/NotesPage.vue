@@ -1,6 +1,6 @@
 <template>
     <div id="app">
-        <FileList />
+        <FilesPanel />
         <EditorPanel />
         <div class="c"></div>
     </div>
@@ -14,13 +14,13 @@ import { ipcRenderer, remote } from 'electron'
 import fs from 'fs'
 import path from 'path'
 
-import FileList from './NotesPage/FileList'
+import FilesPanel from './NotesPage/FilesPanel'
 import EditorPanel from './NotesPage/EditorPanel'
 import Keyboard from '../Keyboard.js'
 
 export default {
     name: 'App',
-    components: { FileList, EditorPanel },
+    components: { FilesPanel, EditorPanel },
     data: function() {
         return {
             config: null,

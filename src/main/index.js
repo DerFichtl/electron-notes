@@ -40,9 +40,9 @@ function createWindow () {
         mainWindow.maximize()
         mainWindow.show()
 
-        if (process.env.env === 'development') {
+        // if (process.env.env === 'development') {
             mainWindow.openDevTools()
-        }
+        // }
 
         webContents.on('will-navigate', handleRedirect)
         webContents.on('new-window', handleRedirect)

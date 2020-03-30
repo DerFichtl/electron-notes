@@ -16,6 +16,47 @@ class EditorBindings {
         this.initSmartbreak()
 
         const bindings = {
+            enter: {
+                key: 13,
+                handler: function (range, context) {
+                    
+                    const lineFormats = Object.keys(context.format).reduce(
+                        (formats, format) => {
+                            if (
+                                this.quill.scroll.query(format, Scope.BLOCK) &&
+                                !Array.isArray(context.format[format])
+                            ) {
+                                formats[format] = context.format[format]
+                            }
+                            return formats
+                        },
+                        {},
+                    )
+
+                    const delta = new Delta()
+                        .retain(range.index)
+                        .delete(range.length)
+                        .insert('\n', lineFormats)
+
+                    this.quill.updateContents(delta, Quill.sources.USER)
+
+                    /* try {
+                        this.quill.setSelection(range.index + 2, Quill.sources.SILENT)
+                    } catch (ex) {
+                        this.quill.setSelection(range.index + 1, Quill.sources.SILENT)
+                    } */
+                    
+                    this.quill.focus()
+
+                    Object.keys(context.format).forEach(name => {
+                        if (lineFormats[name] != null) return;
+                        if (Array.isArray(context.format[name])) return;
+                        if (name === 'code' || name === 'link') return;
+                        this.quill.format(name, context.format[name], Quill.sources.USER);
+                    })
+                    
+                }
+            },
             shiftEnter: {
                 key: 13,
                 shiftKey: true,
@@ -28,7 +69,7 @@ class EditorBindings {
                     // Insert a second break if:
                     // At the end of the editor, OR next leaf has a different parent (<p>)
                     if (nextLeaf === null || (currentLeaf.parent !== nextLeaf.parent)) {
-                      this.quill.insertEmbed(range.index, 'break', true, 'user')
+                        this.quill.insertEmbed(range.index, 'break', true, 'user')
                     }
             
                     // Now that we've inserted a line break, move the cursor forward
@@ -54,7 +95,7 @@ class EditorBindings {
                     this.quill.format('header', headlineSize)
                 }
             },
-            // cannot overwrite the default "list empty enter"
+            // cannot overwrite the default: "list empty enter"
             listEmptyEnter: {
                 key: 13,
                 collapsed: true,
@@ -141,6 +182,8 @@ class EditorBindings {
         let Break = Quill.import('blots/break')
         let Embed = Quill.import('blots/embed')
 
+        let _this = this
+
         class SmartBreak extends Break {
             length () {
                 return 1
@@ -165,12 +208,12 @@ class EditorBindings {
     /**
      * format urls as links on copy/paste or keyboard enter
      */
-    bindUrls() {
+    /* bindUrls() {
         this.editor.clipboard.addMatcher(Node.TEXT_NODE, (node, delta) => {
             this.logger.debug('clipboard: formatLink')
             return this.formatLink(node, delta)
         })
-    }
+    } */
 
 
     formatLink(node, delta) {
