@@ -81,7 +81,6 @@ export default {
         this.logger.debug()
 
         this.loadFilesFromDataDir()
-        this.createTaskOverview()
 
         this.$root.$on('overview-clicked', this.createTaskOverview)
 
@@ -243,7 +242,7 @@ export default {
             this.logger.debug()
 
             const search = new Search(this.config.dataDir, this.folders)
-            return search.filterFiles(query, fullResults)
+            return search.filterFiles(query)
         }
     }
 }

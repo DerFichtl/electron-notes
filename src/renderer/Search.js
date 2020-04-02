@@ -12,60 +12,87 @@ class Search {
     /**
      * filter files
      * @param string search string as regex 
-     * @param bool fullResults add match results to return value for later use
      * @param string ignoreFiles 
-     * @param bool plain: strip off html tags and search only in plain text
+     * @param bool searchInPlain: strip off html tags and search only in plain text
      */
-    filterFiles(query, fullResults = false, ignoreFiles = [], plain = true) {
+    filterFiles(query, ignoreFiles = [], searchInPlain = false) {
 
         let regexp = new RegExp(query, "igm")
         let results = this.folders
+
+        // console.log('----------')
+        // console.log(query)
 
         for (let f in results) {
             const folder = results[f]
 
             for (let ff in results[f].files) {
+
                 const file = results[f].files[ff]
+                const filePath = path.join(this.dataDir, folder.name, file.name) + '.' + file.ext
+
+                // console.log('----')
+                // console.log(folder.name, file.name, file.ext)
+                // console.log(filePath)
+
+                let remove = false
 
                 if(file.name === '' || file.name === undefined) {
-                    continue
+                    remove = true
                 }
-                
+
                 if (ignoreFiles && ignoreFiles.indexOf(file.name) !== -1) {
-                    continue
+                    remove = true
                 }
 
-                let filePath = path.join(this.dataDir, folder.name, file.name) + '.' + file.ext
+                // ignore subdirectories or wrong pa
+                if (! fs.existsSync(filePath) || fs.lstatSync(filePath).isDirectory()) {
+                    remove = true
+                }
 
-                if (fs.existsSync(filePath)) {
+                // ignore non html files
+                if (filePath.indexOf('.html') === -1) {
+                    remove = true
+                }
 
-                    // ignore subdirectories
-                    if (fs.lstatSync(filePath).isDirectory()) {
-                        continue
+                let html, content, matchesArr = null
+
+                if(remove === false) {
+
+                    html = fs.readFileSync(filePath, "utf-8")
+                    content = stripHtml(html)
+                    matchesArr = []
+
+                    // console.log(html)
+
+                    let matches = []
+
+                    if(searchInPlain === true) {
+                        matches = content.matchAll(regexp)
+                    } else {
+                        html = html.replace(/<ul/g, "\n<ul")
+                        matches = html.matchAll(regexp)
                     }
 
-                    let content = fs.readFileSync(filePath, "utf-8")
-
-                    // TODO: remove this hack
-                    content = content.replace(/<ul/g, "\n<ul")
-
-                    // if html then strip tags
-                    if (plain === true && filePath.indexOf('.html')) {
-                        content = stripHtml(content)
-                    }
-
-                    let matchesArr = []
-                    const matches = content.matchAll(regexp)
                     for (const match of matches) {
                         matchesArr.push(match)
                     }
 
+                    // console.log(matchesArr.length)
+
                     if(matchesArr.length === 0) {
-                        // remove file from results if no matches
-                        results[f].files[ff] = { }
-                    } else if (fullResults === true && matchesArr.length > 0) {
-                        results[f].files[ff].matches = matchesArr
+                        remove = true
                     }
+                }
+
+                // console.log(file, remove)
+
+                if(remove === true) {
+                    results[f].files.splice(ff, 1)
+                } else {
+                    results[f].files[ff].matches = matchesArr
+                    results[f].files[ff].content = content
+                    results[f].files[ff].html = html
                 }
             }
         }

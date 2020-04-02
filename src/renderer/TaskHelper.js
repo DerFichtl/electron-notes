@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import Search from './Search.js'
+import cheerio from 'cheerio'
 
 class TaskHelper {
 
@@ -24,38 +25,35 @@ class TaskHelper {
 
     searchTasksInFiles() {
 
-        let search = new Search(this.dataDir, this.folders)
+        const search = new Search(this.dataDir, this.folders)
+        const folderMatches = search.filterFiles('<ul class="todo-list"[^>]*>(.*)</ul>', this.excludeFiles)
+
         let matches = []
         let tasks = []
 
-        let folderMatchs = search.filterFiles('<ul[^>]*>(.*)</ul>', true, this.excludeFiles, false)
-        
-        for (const folderMatch of folderMatchs) {
+        for (const folderMatch of folderMatches) {
             for (const fileMatch of folderMatch.files) {
-
-                if(! fileMatch.matches || ! fileMatch.matches[0]
-                    || ! fileMatch.matches[0][0] || ! fileMatch.matches[0][1]) {
-
-                    continue
-                }
-
-                for(const f in fileMatch.matches) {
-
-                    if(fileMatch.matches[f][0].indexOf('data-checked') === -1) {
-                        continue
-                    }
-
-                    let items = fileMatch.matches[f][1].replace(/<\/li>/g, '').split(/<li>/).filter((el)=>{ return el != '' })
+                
+                if(fileMatch.html) {
                     
-                    for (const item of items) {
-                        let match = fileMatch
-                        match.match = fileMatch.matches[f]
-                        match.text = item
-                        tasks.push(this.parseTaskMatchHtml(match))
+                    // console.log('----')
+                    // console.log(fileMatch.path)
+                    // console.log(fileMatch.html)
+
+                    const $ = cheerio.load(fileMatch.html)
+                    const li = $('ul.todo-list').find('li')
+
+                    for(let i=0; i<li.length; i++) {
+                        let task = this.parseTaskHtml(fileMatch, $(li[i]).html())
+                        tasks.push(task)
+
+                        // console.log(task)
                     }
                 }
             }
         }
+
+        // console.log('====')
 
         tasks.sort(function(a, b) {
             if (a.dueDate > b.dueDate) return 1
@@ -67,16 +65,18 @@ class TaskHelper {
         return tasks
     }
 
-    parseTaskMatchHtml(match) {
+    parseTaskHtml(file, taskHtml) {
 
         let task = {}
 
-        task.path = match.path
-        task.raw = match.match
-        task.text = match.text.trim()
+        const $ = cheerio.load(taskHtml)
+
+        task.path = file.path
+        task.raw = taskHtml
+        task.text = $(taskHtml).find('span').text()
 
         task.status = 'OPEN'
-        if(task.raw[0].indexOf('data-checked="true"') > -1) {
+        if($(taskHtml).find('input').attr('checked')) {
             task.status = 'DONE'
         }
         
@@ -105,7 +105,7 @@ class TaskHelper {
 
     formatOverviewContentHtml(tasks) {
 
-        let content = "<h1>All Open Tasks</h1><p><br /></p>"
+        let content = "<h1>All Open Tasks</h1>"
         let lastDate = ''
         let taskIndex = 0
 
@@ -114,31 +114,37 @@ class TaskHelper {
 
                 if(taskIndex === 0) {
                     if(task.dueDate === '') {
-                        content += '<h2>No due date</h2><ul data-checked="false">'
+                        content += '<h2>No due date</h2><ul class="todo-list">'
                     } else {
-                        content += '<h2>' + task.dueDate + '</h2><ul data-checked="false">'
+                        content += '<h2>' + task.dueDate + '</h2><ul class="todo-list">'
                     }
                 }     
 
                 if(lastDate !== task.dueDate) {
-                    content += '</ul><p><br /></p>'
-                    content += '<h2>' + task.dueDate + '</h2><ul data-checked="false">'
+                    content += '</ul>'
+                    content += '<h2>' + task.dueDate + '</h2><ul class="todo-list">'
                     
                     lastDate = task.dueDate
                 }
 
-                content += '<li>' + task.text + "</li>"
+                content += '<li>'
+                content += '<label class="todo-list__label"><input type="checkbox" disabled="disabled">'
+                content += '<span class="todo-list__label__description">' + task.text + "</span>"
+                content += '</li>'
 
                 taskIndex++
             }
         }
 
-        content += '</ul><p><br /></p>'
+        content += '</ul>'
   
-        content += '<h2>Done Tasks</h2><ul data-checked="true">'
+        content += '<h2>Done Tasks</h2><ul class="todo-list">'
         for (const task of tasks) {
             if(task.status === 'DONE') {
-                content += '<li>' + task.text + "</li>"
+                content += '<li>'
+                content += '<label class="todo-list__label"><input type="checkbox" disabled="disabled" checked="checked">'
+                content += '<span class="todo-list__label__description">' + task.text + "</span>"
+                content += '</li>'
             }
         }
 

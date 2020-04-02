@@ -16,7 +16,6 @@ import path from 'path'
 
 import FilesPanel from './NotesPage/FilesPanel'
 import EditorPanel from './NotesPage/EditorPanel'
-import Keyboard from '../Keyboard.js'
 
 export default {
     name: 'App',

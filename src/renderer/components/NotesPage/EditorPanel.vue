@@ -10,13 +10,10 @@ import fs from 'fs'
 import path from 'path'
 import dateFormat from 'dateformat'
 
-// import Mousetrap from 'mousetrap'
-import Editor from '../../ckeditor.js'
-
-// import EditorBindings from '../../keyboard/EditorBindings.js'
+import { Editor } from '../../ckeditor.js'
 
 import { shell, remote } from 'electron'
-const { Menu, MenuItem } = remote
+const { Menu, MenuItem, dialog } = remote
 
 
 export default {
@@ -93,8 +90,8 @@ export default {
                         toolbar: [ 'heading', '|',
                             'bold', 'italic', 'link', 'fontColor', 'removeFormat', '|',
                             'bulletedList', 'numberedList', 'todoList', '|',
-                            'blockQuote', 'codeBlock', '|',
-                            'insertTable', '|', 'mediaEmbed', 'imageUpload' ],
+                            'blockQuote', 'codeBlock', 'insertTable', '|',
+                            'mediaEmbed', 'imageUpload' ],
                         heading: {
                             options: [
                                 { model: 'paragraph', title: 'Paragraph', class: 'ck-heading_paragraph' },
@@ -104,11 +101,16 @@ export default {
                             ]
                         },
                         image: {
-                            toolbar: [
-                                'imageTextAlternative',
+                            /* toolbar: [
+                                'imageStyle:alignLeft',
                                 'imageStyle:full',
-                                'imageStyle:side'
-                            ]
+                                'imageStyle:alignRight'
+                            ],
+                            styles: [
+                                'full',
+                                'alignLeft',
+                                'alignRight'
+                            ] */
                         },
                         table: {
                             contentToolbar: [
@@ -133,7 +135,7 @@ export default {
                         this.openContextmenu(evt)
                     })
 
-                    console.log( Array.from( editor.ui.componentFactory.names() ));
+                    // console.log( Array.from( editor.ui.componentFactory.names() ));
                 })
                 .catch(error => {
                     // 
@@ -155,13 +157,41 @@ export default {
             menu.append(new MenuItem({label: 'Cut', role: 'cut' }))
             menu.append(new MenuItem({label: 'Copy', role: 'copy' }))
             menu.append(new MenuItem({label: 'Paste', role: 'paste' }))
+            menu.append(new MenuItem({label: 'Select All', role: 'selectall' }))
 
             menu.append(new MenuItem({type: 'separator'}))
 
-            menu.append(new MenuItem({label: 'Select All', role: 'selectall' }))
+            if(evt.target.nodeName === 'IMG') {
+
+                menu.append(new MenuItem({
+                    label: 'Save image as..',
+                    click: () => {
+
+                        const dataUrl = evt.target.currentSrc
+                        const type = dataUrl.substring(dataUrl.indexOf('/')+1, dataUrl.indexOf(';'))
+                        const downloadsPath = remote.app.getPath('downloads')
+
+                        const options = {
+                            defaultPath: downloadsPath + '/Image.' + type,
+                            properties: ['createDirectory']
+                        }
+
+                        dialog.showSaveDialog(null, options, (path) => {
+                            
+                            if(! path) {
+                                return
+                            }
+
+                            const uu = dataUrl.substring(dataUrl.indexOf(','))
+                            fs.writeFileSync(path, uu, 'base64')
+                        })
+                    }
+                }))
+
+            }
 
             menu.append(new MenuItem({
-                label: 'Create Link',
+                label: 'Create Link..',
                 click: () => {
                     let toolbarItems = this.editor.ui.view.toolbar.items
                     for(let item of toolbarItems) {
@@ -240,6 +270,11 @@ export default {
 .ck.ck-editor__editable_inline,
 .ck.ck-editor__editable:not(.ck-editor__nested-editable).ck-focused { border:none; outline:none; box-shadow:none; }
 
-.ck.ck-toolbar { border:none; background:none; }
+.ck.ck-toolbar { border:none; background:#fff; }
+
+.ck-content .table { margin: 1em 0; }
+.ck-content .table th { background:#eee; }
+.ck-content .image { margin: 1em 0; }
+.ck-content .image>figcaption { text-align:left; }
 
 </style>
